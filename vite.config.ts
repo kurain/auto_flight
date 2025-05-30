@@ -20,6 +20,7 @@ export default defineConfig(({ command }) => ({
     },
   },
   build: {
+    assetsInlineLimit: 0, // アセットをインライン化しない
     target: 'es2022',
     minify: 'terser',
     sourcemap: true,

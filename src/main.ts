@@ -350,8 +350,9 @@ function init(): void {
   
   // GLTFLoaderでfighter.glbを読み込み
   const loader = new GLTFLoader();
+  const baseUrl = (import.meta as any).env?.BASE_URL || '/';
   loader.load(
-    '/data/fighter.glb',
+    `${baseUrl}data/fighter.glb`,
     (gltf: any) => {
       fighter = gltf.scene;
       if (fighter) {
