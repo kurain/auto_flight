@@ -1,7 +1,11 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
+import { resolve } from 'node:path';
+import { fileURLToPath, URL } from 'node:url';
 
-export default defineConfig({
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/auto_flight/' : '/',
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
@@ -31,4 +35,4 @@ export default defineConfig({
     port: 3000,
     open: true,
   },
-});
+}));
