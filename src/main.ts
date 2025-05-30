@@ -1,7 +1,7 @@
 import './style.css';
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
-// import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+// import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 // ミサイルクラス
 class Missile {
@@ -157,20 +157,25 @@ class Explosion {
     const lifeRatio = this.lifetime / this.maxLifetime;
     
     // パーティクルの位置を更新
-    const positions = this.particleSystem.geometry.attributes.position.array as Float32Array;
-    
-    for (let i = 0; i < this.particleCount; i++) {
-      const i3 = i * 3;
-      const velocity = this.velocities[i];
+    const positionAttribute = this.particleSystem.geometry.attributes['position'];
+    if (positionAttribute) {
+      const positions = positionAttribute.array as Float32Array;
       
-      // 位置の更新
-      positions[i3] += velocity.x * deltaTime;
-      positions[i3 + 1] += velocity.y * deltaTime;
-      positions[i3 + 2] += velocity.z * deltaTime;
+      for (let i = 0; i < this.particleCount; i++) {
+        const i3 = i * 3;
+        const velocity = this.velocities[i];
+        
+        if (velocity && positions && i3 + 2 < positions.length) {
+          // 位置の更新
+          positions[i3] += velocity.x * deltaTime;
+          positions[i3 + 1] += velocity.y * deltaTime;
+          positions[i3 + 2] += velocity.z * deltaTime;
+        }
+      }
+      
+      // ジオメトリの更新フラグ
+      positionAttribute.needsUpdate = true;
     }
-    
-    // ジオメトリの更新フラグ
-    this.particleSystem.geometry.attributes.position.needsUpdate = true;
     
     // マテリアルの更新（透明度とサイズ）
     const material = this.particleSystem.material as THREE.PointsMaterial;
@@ -210,8 +215,12 @@ class SmokeTrail {
       const oldParticle = this.particles.shift();
       if (oldParticle) {
         this.scene.remove(oldParticle);
-        oldParticle.geometry.dispose();
-        (oldParticle.material as THREE.Material).dispose();
+        if (oldParticle.geometry) {
+          oldParticle.geometry.dispose();
+        }
+        if (oldParticle.material) {
+          (oldParticle.material as THREE.Material).dispose();
+        }
       }
       this.positions.shift();
       this.particleAges.shift();
@@ -219,7 +228,9 @@ class SmokeTrail {
     
     // パーティクルの年齢を更新
     for (let i = 0; i < this.particleAges.length; i++) {
-      this.particleAges[i] += deltaTime;
+      if (this.particleAges[i] !== undefined) {
+        this.particleAges[i] += deltaTime;
+      }
     }
     
     // 新しいパーティクルを作成
@@ -243,17 +254,22 @@ class SmokeTrail {
     
     // パーティクルの更新（サイズと透明度）
     for (let i = 0; i < this.particles.length; i++) {
-      const age = this.particleAges[i];
-      const lifeRatio = age / this.particleLifetime;
-      
-      if (lifeRatio < 1.0) {
-        const isMissileTrail = this.maxParticles === 50;
-        const scale = 1.0 + lifeRatio * (isMissileTrail ? 0.2 : 0.3); // ミサイルは成長を抑える
-        this.particles[i].scale.setScalar(scale);
+      const particle = this.particles[i];
+      if (particle) {
+        const age = this.particleAges[i] || 0;
+        const lifeRatio = age / this.particleLifetime;
         
-        const material = this.particles[i].material as THREE.MeshBasicMaterial;
-        const baseOpacity = isMissileTrail ? 0.7 : 0.4;
-        material.opacity = Math.max(0, baseOpacity * (1.0 - lifeRatio)); // フェードアウト
+        if (lifeRatio < 1.0) {
+          const isMissileTrail = this.maxParticles === 50;
+          const scale = 1.0 + lifeRatio * (isMissileTrail ? 0.2 : 0.3); // ミサイルは成長を抑える
+          particle.scale.setScalar(scale);
+          
+          if (particle.material) {
+            const material = particle.material as THREE.MeshBasicMaterial;
+            const baseOpacity = isMissileTrail ? 0.7 : 0.4;
+            material.opacity = Math.max(0, baseOpacity * (1.0 - lifeRatio)); // フェードアウト
+          }
+        }
       }
     }
   }
@@ -336,21 +352,23 @@ function init(): void {
   const loader = new GLTFLoader();
   loader.load(
     '/data/fighter.glb',
-    (gltf) => {
+    (gltf: any) => {
       fighter = gltf.scene;
-      fighter.scale.set(0.5, 0.5, 0.5); // スケール調整
-      fighter.position.set(0, 0, 0);
-      scene.add(fighter);
-      
-      // 飛行機雲エフェクトを初期化
-      smokeTrail = new SmokeTrail(scene);
+      if (fighter) {
+        fighter.scale.set(0.5, 0.5, 0.5); // スケール調整
+        fighter.position.set(0, 0, 0);
+        scene.add(fighter);
+        
+        // 飛行機雲エフェクトを初期化
+        smokeTrail = new SmokeTrail(scene);
+      }
       
       console.log('Fighter model loaded successfully');
     },
-    (progress) => {
+    (progress: any) => {
       console.log('Loading progress:', (progress.loaded / progress.total) * 100 + '%');
     },
-    (error) => {
+    (error: any) => {
       console.error('Error loading fighter model:', error);
     }
   );
@@ -429,7 +447,7 @@ function init(): void {
           }
           
           // 同じ位置から発射
-          if (currentSpawnPosition) {
+          if (currentSpawnPosition && fighter) {
             const missile = new Missile(scene, currentSpawnPosition.clone(), fighter);
             missiles.push(missile);
             burstCount++;
@@ -448,27 +466,31 @@ function init(): void {
       // ミサイルの更新
       for (let i = missiles.length - 1; i >= 0; i--) {
         const missile = missiles[i];
-        const shouldKeep = missile.update(deltaTime);
-        
-        if (!shouldKeep) {
-          // 爆発エフェクトを生成
-          const explosion = new Explosion(scene, missile.mesh.position.clone());
-          explosions.push(explosion);
+        if (missile) {
+          const shouldKeep = missile.update(deltaTime);
           
-          // ミサイルを削除
-          missile.dispose(scene);
-          missiles.splice(i, 1);
+          if (!shouldKeep) {
+            // 爆発エフェクトを生成
+            const explosion = new Explosion(scene, missile.mesh.position.clone());
+            explosions.push(explosion);
+            
+            // ミサイルを削除
+            missile.dispose(scene);
+            missiles.splice(i, 1);
+          }
         }
       }
       
       // 爆発エフェクトの更新
       for (let i = explosions.length - 1; i >= 0; i--) {
         const explosion = explosions[i];
-        const shouldKeep = explosion.update(deltaTime);
-        
-        if (!shouldKeep) {
-          // 爆発エフェクトを削除
-          explosions.splice(i, 1);
+        if (explosion) {
+          const shouldKeep = explosion.update(deltaTime);
+          
+          if (!shouldKeep) {
+            // 爆発エフェクトを削除
+            explosions.splice(i, 1);
+          }
         }
       }
     }
